@@ -1,0 +1,36 @@
+[tool.poetry]
+name = "dedup_me"
+version = "0.1.0"
+description = "Deduplicate concurrent function calls."
+authors = ["Christopher Krause <ottermata@pm.me>"]
+license = "MIT"
+readme = "README.md"
+packages = [{include = "dedup_me"}]
+repository =  "https://github.com/ottermata/dedup_me"
+keywords = ["dedup", "deduplication", "request"]
+classifiers = [
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python",
+    "Topic :: Software Development :: Libraries",
+    "Topic :: Software Development",
+    "Typing :: Typed",
+]
+
+[tool.poetry.urls]
+"Bug Tracker" = "https://github.com/ottermata/dedup_me/issues"
+
+[tool.poetry.dependencies]
+python = "^3.8"
+
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.2.1"
+mypy = "^1.0.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
