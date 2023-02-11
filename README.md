@@ -1,3 +1,5 @@
+[![PyPI version](https://badge.fury.io/py/dedup-me.svg)](https://badge.fury.io/py/dedup-me)
+
 # dedup_me
 
 dedup_me is a simple library for concurrent in-flight deduplication of functions.
@@ -5,6 +7,9 @@ This can be useful for e.g. API calls or DB access. Instead of querying the same
 this library allows you to query once and share the result.
 
 Note: This library does not cache results. After the result is returned, new consumers will call the function(API, DB, ...) again.
+
+# Installation
+`pip install dedup-me`
 
 # Usage
 
