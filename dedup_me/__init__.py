@@ -1,7 +1,9 @@
-from ._asyncio import AsyncioDedup
-from ._threading import ThreadingDedup
+from ._async import AsyncDedup, async_dedup
+from ._threading import ThreadingDedup, threading_dedup
 
 __all__ = [
-    'AsyncioDedup',
+    'AsyncDedup',
+    'async_dedup',
     'ThreadingDedup',
+    'threading_dedup',
 ]

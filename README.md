@@ -14,25 +14,22 @@ Note: This library does not cache results. After the result is returned, new con
 import asyncio
 import random
 
-from dedup_me import AsyncioDedup
+from dedup_me import async_dedup
 
-
-async def expensive_function():
+# @async_dedup('static-key')  # if the arguments don't matter, you can use a static key
+@async_dedup(key = lambda x: f'dynamic-key-{x}')  # or pass in a key function that accepts all arguments
+async def expensive_function(x: int) -> int:
     print('expensive function called')
-    await asyncio.sleep(1)
+    await asyncio.sleep(x)
     return random.randint(0, 10)
 
 
-async def main():
-    dedup = AsyncioDedup()
-
+async def main() -> None:
     # call the function 10 times
     # this should only print 'expensive function called' once
     results = await asyncio.gather(
         *(
-            # functions are grouped by the key, choose something that represents the function and its arguments
-            # the second argument must be a function without arguments that returns an awaitable
-            dedup.run('some-key', lambda: expensive_function())
+            expensive_function(1)
             for _ in range(10)
         )
     )
@@ -40,8 +37,49 @@ async def main():
     # all results should be the same
     results_list = list(results)
     assert results_list == [results_list[0]] * 10
+```
+
+Alternatively, without the decorator:
+```python
+import asyncio
+import random
+
+from dedup_me import AsyncDedup
 
 
-if __name__ == '__main__':
-    asyncio.run(main())
+async def expensive_function() -> int:
+    print('expensive function called')
+    await asyncio.sleep(1)
+    return random.randint(0, 10)
+
+
+async def main() -> None:
+    dedup = AsyncDedup()
+    await asyncio.gather(
+        *(
+            # functions are grouped by the key, choose something that represents the function and its arguments
+            # the second argument must be a function without arguments that returns an awaitable
+            dedup.run('some-key', lambda: expensive_function())
+            for _ in range(10)
+        )
+    )
+```
+
+## Threads
+
+For threading just use the `threading_dedup` decorator or `ThreadingDedup`.
+```python
+from time import sleep
+from dedup_me import threading_dedup, ThreadingDedup
+
+
+@threading_dedup('key')
+def expensive_function() -> None:
+    sleep(1)
+
+expensive_function()
+
+# or
+dedup = ThreadingDedup()
+dedup.run('key', lambda: sleep(1))
 ```

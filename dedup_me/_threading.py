@@ -1,11 +1,13 @@
 import uuid
+from functools import update_wrapper
 from threading import Event, Lock
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Callable, TypeVar
+    from typing import Callable, ParamSpec, TypeVar
 
     T = TypeVar('T')
+    P = ParamSpec('P')
 
 
 class ThreadingDedup:
@@ -105,3 +107,43 @@ class ThreadingDedup:
             return self._wait_for_result(event, internal_key)  # type: ignore[return-value]
         else:
             return self._handle_result(key, function())
+
+
+def threading_dedup(
+        static_key: str | None = None,
+        key: 'Callable[P, str] | None' = None,
+        dedup: ThreadingDedup | None = None,
+) -> 'Callable[[Callable[P, T]], Callable[P, T]]':
+    """
+    Decorator for de-duplicating a function.
+
+    :param static_key: Static key, if the function arguments don't matter
+    :param key: Key function, generate a key based on the function arguments
+    :param dedup: ThreadingDedup instance to use, will create a new one if not set
+    :return: Wrapped function
+    """
+    if (static_key is None) == (key is None):
+        raise ValueError('Exactly one of `static_key` or `key` must be set')
+    if static_key is not None and not isinstance(static_key, str):
+        raise ValueError('`static_key` must be a string, use `key` for generating keys based on the arguments')
+    if key is not None and not callable(key):
+        raise ValueError('`key` must be a callable')
+
+    if dedup is None:
+        dedup = ThreadingDedup()
+    elif not isinstance(dedup, ThreadingDedup):
+        raise ValueError('`dedup` must be an instance of ThreadingDedup')
+
+    def wrapper(f: 'Callable[P, T]') -> 'Callable[P, T]':
+        if static_key:
+            def inner(*args: 'P.args', **kwargs: 'P.kwargs') -> 'T':
+                return dedup.run(static_key, lambda: f(*args, **kwargs))  # type: ignore[union-attr,arg-type]
+
+        else:
+            def inner(*args: 'P.args', **kwargs: 'P.kwargs') -> 'T':
+                k = key(*args, **kwargs)  # type: ignore[misc]
+                return dedup.run(k, lambda: f(*args, **kwargs))  # type: ignore[union-attr]
+
+        return update_wrapper(inner, f)
+
+    return wrapper

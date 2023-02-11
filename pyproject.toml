@@ -10,8 +10,6 @@ repository =  "https://github.com/ottermata/dedup_me"
 keywords = ["dedup", "deduplication", "request"]
 classifiers = [
     "Operating System :: OS Independent",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python",
@@ -24,12 +22,13 @@ classifiers = [
 "Bug Tracker" = "https://github.com/ottermata/dedup_me/issues"
 
 [tool.poetry.dependencies]
-python = "^3.8"
+python = "^3.10"
 
 
 [tool.poetry.group.dev.dependencies]
-pytest = "^7.2.1"
 mypy = "^1.0.0"
+pytest = "^7.2.1"
+pytest-asyncio = "^0.20.3"
 
 [build-system]
 requires = ["poetry-core"]

@@ -1,8 +1,83 @@
+import random
 from concurrent.futures import ThreadPoolExecutor
 from threading import Event
 from time import sleep
 
-from dedup_me import ThreadingDedup
+from dedup_me import ThreadingDedup, threading_dedup
+
+
+def test_decorator_static() -> None:
+    event = Event()
+
+    @threading_dedup('static-key')
+    def wait_for_event() -> int:
+        event.wait()
+        return random.randint(0, 10)
+
+    with ThreadPoolExecutor() as executor:
+        thread = executor.submit(wait_for_event)
+        sleep(0.1)
+        consumer = executor.submit(wait_for_event)
+        sleep(0.1)
+
+        event.set()
+        assert thread.result() == consumer.result()
+
+
+def test_decorator_dynamic() -> None:
+    event = Event()
+
+    @threading_dedup(key = lambda n: f'key-{n}')
+    def wait_for_event(n: int) -> int:
+        event.wait()
+        return n
+
+    with ThreadPoolExecutor() as executor:
+        thread = executor.submit(wait_for_event, 1)
+        sleep(0.1)
+        consumer = executor.submit(wait_for_event, 1)
+        sleep(0.1)
+
+        thread2 = executor.submit(wait_for_event, 2)
+        sleep(0.1)
+
+        event.set()
+
+        assert thread2.result() == 2
+
+        assert thread.result() == 1
+        assert consumer.result() == 1
+
+
+# noinspection PyProtectedMember
+def test_decorator_instance() -> None:
+    event = Event()
+    dedup = ThreadingDedup()
+
+    @threading_dedup('static-key', dedup = dedup)
+    def wait_for_event() -> int:
+        event.wait()
+        return 1
+
+    with ThreadPoolExecutor() as executor:
+        thread = executor.submit(wait_for_event, 1)
+        sleep(0.1)
+
+        with dedup._running_lock, dedup._results_lock, dedup._counts_lock:
+            assert len(dedup._running) == 1
+            assert len(dedup._counts) == 1
+            assert len(dedup._results) == 0
+
+            internal_key = dedup._running['static-key'][1]
+            assert dedup._counts[internal_key] == 0
+
+        event.set()
+        assert thread.result() == 1
+
+    with dedup._running_lock, dedup._results_lock, dedup._counts_lock:
+        assert len(dedup._running) == 0
+        assert len(dedup._counts) == 0
+        assert len(dedup._results) == 0
 
 
 # noinspection PyProtectedMember

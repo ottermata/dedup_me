@@ -1,14 +1,16 @@
 import uuid
 from asyncio import Event
+from functools import update_wrapper
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from typing import Callable, Awaitable, TypeVar
+    from typing import Awaitable, Callable, ParamSpec, TypeVar
 
     T = TypeVar('T')
+    P = ParamSpec('P')
 
 
-class AsyncioDedup:
+class AsyncDedup:
     __slots__ = '_running', '_results', '_counts'
 
     def __init__(self) -> None:
@@ -87,3 +89,43 @@ class AsyncioDedup:
             self._counts[internal_key] = 0
 
             return await self._handle_result(key, getter())
+
+
+def async_dedup(
+        static_key: str | None = None,
+        key: 'Callable[P, str] | None' = None,
+        dedup: AsyncDedup | None = None,
+) -> 'Callable[[Callable[P, Awaitable[T]]], Callable[P, Awaitable[T]]]':
+    """
+    Decorator for de-duplicating an async function.
+
+    :param static_key: Static key, if the function arguments don't matter
+    :param key: Key function, generate a key based on the function arguments
+    :param dedup: AsyncioDedup instance to use, will create a new one if not set
+    :return: Wrapped function
+    """
+    if (static_key is None) == (key is None):
+        raise ValueError('Exactly one of `static_key` or `key` must be set')
+    if static_key is not None and not isinstance(static_key, str):
+        raise ValueError('`static_key` must be a string, use `key` for generating keys based on the arguments')
+    if key is not None and not callable(key):
+        raise ValueError('`key` must be a callable')
+
+    if dedup is None:
+        dedup = AsyncDedup()
+    elif not isinstance(dedup, AsyncDedup):
+        raise ValueError('`dedup` must be an instance of AsyncioDedup')
+
+    def wrapper(f: 'Callable[P, Awaitable[T]]') -> 'Callable[P, Awaitable[T]]':
+        if static_key:
+            async def inner(*args: 'P.args', **kwargs: 'P.kwargs') -> 'T':
+                return await dedup.run(static_key, lambda: f(*args, **kwargs))  # type: ignore[union-attr,arg-type]
+
+        else:
+            async def inner(*args: 'P.args', **kwargs: 'P.kwargs') -> 'T':
+                k = key(*args, **kwargs)  # type: ignore[misc]
+                return await dedup.run(k, lambda: f(*args, **kwargs))  # type: ignore[union-attr]
+
+        return update_wrapper(inner, f)
+
+    return wrapper
