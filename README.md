@@ -9,7 +9,9 @@ this library allows you to query once and share the result.
 Note: This library does not cache results. After the result is returned, new consumers will call the function(API, DB, ...) again.
 
 # Installation
-`pip install dedup-me`
+```shell
+pip install dedup-me
+```
 
 # Usage
 
