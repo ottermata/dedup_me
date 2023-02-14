@@ -19,9 +19,9 @@ async def test_decorator_static() -> None:
         return count
 
     task = asyncio.create_task(wait_for_event())
-    await asyncio.sleep(0.01)
+    await asyncio.sleep(0.1)
     consumer = asyncio.create_task(wait_for_event())
-    await asyncio.sleep(0.01)
+    await asyncio.sleep(0.1)
 
     event.set()
 
@@ -44,14 +44,14 @@ async def test_decorator_dynamic() -> None:
         return n
 
     task = asyncio.create_task(wait_for_event(1))
-    await asyncio.sleep(0.01)
+    await asyncio.sleep(0.1)
     consumer = asyncio.create_task(wait_for_event(1))
-    await asyncio.sleep(0.01)
+    await asyncio.sleep(0.1)
 
     assert count == 1
 
     task2 = asyncio.create_task(wait_for_event(2))
-    await asyncio.sleep(0.01)
+    await asyncio.sleep(0.1)
 
     assert count == 2
 
@@ -77,7 +77,7 @@ async def test_decorator_instance() -> None:
         return 1
 
     task = asyncio.create_task(wait_for_event())
-    await asyncio.sleep(0.01)
+    await asyncio.sleep(0.1)
 
     assert len(dedup._running) == 1
     assert len(dedup._counts) == 1
@@ -96,6 +96,87 @@ async def test_decorator_instance() -> None:
 
 # noinspection PyProtectedMember
 @pytest.mark.asyncio
+async def test_decorator_force() -> None:
+    dedup = AsyncDedup()
+
+    @async_dedup('static-key', dedup = dedup, force_new = lambda _event: True)
+    async def wait_for_event(event: Event) -> int:
+        await event.wait()
+        return 1
+
+    event1 = Event()
+    task1 = asyncio.create_task(wait_for_event(event1))
+    await asyncio.sleep(0.1)
+
+    assert len(dedup._running) == 1
+    assert len(dedup._counts) == 1
+    assert len(dedup._results) == 0
+
+    event2 = Event()
+    task2 = asyncio.create_task(wait_for_event(event2))
+    await asyncio.sleep(0.1)
+
+    assert len(dedup._running) == 1
+    assert len(dedup._counts) == 2
+    assert len(dedup._results) == 0
+
+    event2.set()
+    assert await task2 == 1
+
+    assert len(dedup._running) == 0
+    assert len(dedup._counts) == 1
+    assert len(dedup._results) == 0
+
+    event1.set()
+    assert await task1 == 1
+
+    assert len(dedup._running) == 0
+    assert len(dedup._counts) == 0
+    assert len(dedup._results) == 0
+
+
+# noinspection PyProtectedMember
+@pytest.mark.asyncio
+async def test_single_force() -> None:
+    dedup = AsyncDedup()
+
+    async def wait_for_event(event: Event) -> int:
+        await event.wait()
+        return 1
+
+    event1 = Event()
+    task1 = asyncio.create_task(dedup.run('test', lambda: wait_for_event(event1)))
+    await asyncio.sleep(0.1)
+
+    assert len(dedup._running) == 1
+    assert len(dedup._counts) == 1
+    assert len(dedup._results) == 0
+
+    event2 = Event()
+    task2 = asyncio.create_task(dedup.run('test', lambda: wait_for_event(event2), force_new = True))
+    await asyncio.sleep(0.1)
+
+    assert len(dedup._running) == 1
+    assert len(dedup._counts) == 2
+    assert len(dedup._results) == 0
+
+    event2.set()
+    assert await task2 == 1
+
+    assert len(dedup._running) == 0
+    assert len(dedup._counts) == 1
+    assert len(dedup._results) == 0
+
+    event1.set()
+    assert await task1 == 1
+
+    assert len(dedup._running) == 0
+    assert len(dedup._counts) == 0
+    assert len(dedup._results) == 0
+
+
+# noinspection PyProtectedMember
+@pytest.mark.asyncio
 async def test_single() -> None:
     dedup = AsyncDedup()
     event = Event()
@@ -105,7 +186,7 @@ async def test_single() -> None:
         return 1
 
     task = asyncio.create_task(dedup.run('test', lambda: wait_for_event()))
-    await asyncio.sleep(0.01)
+    await asyncio.sleep(0.1)
 
     assert len(dedup._running) == 1
     assert len(dedup._counts) == 1

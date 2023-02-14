@@ -60,7 +60,7 @@ def test_decorator_instance() -> None:
         return 1
 
     with ThreadPoolExecutor() as executor:
-        thread = executor.submit(wait_for_event, 1)
+        thread = executor.submit(wait_for_event)
         sleep(0.1)
 
         with dedup._running_lock, dedup._results_lock, dedup._counts_lock:
@@ -73,6 +73,95 @@ def test_decorator_instance() -> None:
 
         event.set()
         assert thread.result() == 1
+
+    with dedup._running_lock, dedup._results_lock, dedup._counts_lock:
+        assert len(dedup._running) == 0
+        assert len(dedup._counts) == 0
+        assert len(dedup._results) == 0
+
+
+# noinspection PyProtectedMember
+def test_decorator_force() -> None:
+    dedup = ThreadingDedup()
+
+    @threading_dedup('static-key', dedup = dedup, force_new = lambda _event: True)
+    def wait_for_event(event: Event) -> int:
+        event.wait()
+        return 1
+
+    with ThreadPoolExecutor() as executor:
+        event1 = Event()
+        thread1 = executor.submit(wait_for_event, event1)
+        sleep(0.1)
+
+        with dedup._running_lock, dedup._results_lock, dedup._counts_lock:
+            assert len(dedup._running) == 1
+            assert len(dedup._counts) == 1
+            assert len(dedup._results) == 0
+
+        event2 = Event()
+        thread2 = executor.submit(wait_for_event, event2)
+        sleep(0.1)
+
+        with dedup._running_lock, dedup._results_lock, dedup._counts_lock:
+            assert len(dedup._running) == 1
+            assert len(dedup._counts) == 2
+            assert len(dedup._results) == 0
+
+        event2.set()
+        assert thread2.result() == 1
+
+        with dedup._running_lock, dedup._results_lock, dedup._counts_lock:
+            assert len(dedup._running) == 0
+            assert len(dedup._counts) == 1
+            assert len(dedup._results) == 0
+
+        event1.set()
+        assert thread1.result() == 1
+
+    with dedup._running_lock, dedup._results_lock, dedup._counts_lock:
+        assert len(dedup._running) == 0
+        assert len(dedup._counts) == 0
+        assert len(dedup._results) == 0
+
+
+# noinspection PyProtectedMember
+def test_force() -> None:
+    dedup = ThreadingDedup()
+
+    def wait_for_event(event: Event) -> int:
+        event.wait()
+        return 1
+
+    with ThreadPoolExecutor() as executor:
+        event1 = Event()
+        thread1 = executor.submit(dedup.run, 'test', lambda: wait_for_event(event1))
+        sleep(0.1)
+
+        with dedup._running_lock, dedup._results_lock, dedup._counts_lock:
+            assert len(dedup._running) == 1
+            assert len(dedup._counts) == 1
+            assert len(dedup._results) == 0
+
+        event2 = Event()
+        thread2 = executor.submit(dedup.run, 'test', lambda: wait_for_event(event2), True)
+        sleep(0.1)
+
+        with dedup._running_lock, dedup._results_lock, dedup._counts_lock:
+            assert len(dedup._running) == 1
+            assert len(dedup._counts) == 2
+            assert len(dedup._results) == 0
+
+        event2.set()
+        assert thread2.result() == 1
+
+        with dedup._running_lock, dedup._results_lock, dedup._counts_lock:
+            assert len(dedup._running) == 0
+            assert len(dedup._counts) == 1
+            assert len(dedup._results) == 0
+
+        event1.set()
+        assert thread1.result() == 1
 
     with dedup._running_lock, dedup._results_lock, dedup._counts_lock:
         assert len(dedup._running) == 0

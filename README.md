@@ -90,3 +90,7 @@ expensive_function()
 dedup = ThreadingDedup()
 dedup.run('key', lambda: sleep(1))
 ```
+
+## Forcing a new execution
+You can enforce a new execution by passing `force_new = True` to the `run` function.
+When using the decorator, you can add a callable that will receive all arguments and returns a boolean.
